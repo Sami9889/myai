@@ -49,11 +49,48 @@ myai search "transformer attention"
 myai time
 myai status
 myai help
+myai repo status
+myai repo add . --confirm
+myai repo commit "Describe the change" --confirm
+myai repo push --confirm
 ```
 
 File writes report the edited path and local timestamp. TODOs persist in
 `.myai-tasks.json`, and `search` indexes local documentation and source only;
 it does not contact Google or any external service.
+
+Repository publishing is guarded: `repo status` is read-only, while `repo
+add`, `repo commit`, and `repo push` require `--confirm`. Pushes target the
+current branch and never force-push or rewrite history.
+
+## Natural Requests
+
+You do not need to memorize command syntax. The CLI understands requests such
+as:
+
+```text
+read README.md
+show Python files
+add a task for review the tokenizer
+search help for attention
+check core_engine/tokenizer.py
+what changed
+install this repo yes
+```
+
+Natural requests use the same repository-scoped tools as exact commands. Read,
+write, and edit operations are allowed anywhere inside the selected workspace
+repository. Paths outside that repository are rejected. Installation,
+commits, and pushes require explicit confirmation.
+
+You can also speak normally:
+
+```text
+Hey, are you there?
+Tell me what you can do.
+Please read the README and tell me what this project is.
+I am here, what should we work on?
+```
 
 The runtime accepts raw model weights through the documented binary parser, but it does not ship model weights. Configure `config.json` with a compatible local model before requesting neural generation. Without weights, the CLI remains useful for safe file inspection, AST analysis, diagnostics, and deterministic tool orchestration.
 

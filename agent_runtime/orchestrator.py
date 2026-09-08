@@ -7,6 +7,7 @@ from .state_machine import SessionState, SessionStatus
 from .context_compressor import ContextCompressor
 from utils.logger import get_logger
 from tools.base_tool import BaseTool, ToolResult
+from .conversation import local_reply
 
 @dataclass(slots=True)
 class AgentConfig:
@@ -52,6 +53,9 @@ class Orchestrator:
         self.messages.append({'role':'tool','content':json.dumps({'name':name,'ok':result.ok,'output':result.output,'error':result.error})})
         return result
     def _fallback(self,task:str)->str:
+        conversational = local_reply(task)
+        if conversational is not None:
+            return conversational
         return (
             'Task received: ' + task + '\n\n'
             'Neural generation is unavailable because config.json has no local '

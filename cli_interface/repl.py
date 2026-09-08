@@ -10,12 +10,15 @@ from tools.dir_walker import DirWalker
 from tools.linter_bridge import LinterBridge
 from tools.system_diagnostics import SystemDiagnostics
 from tools.help_search import HelpSearch
+from tools.repo_manager import RepoManager
+from tools.installer import Installer
+from cli_interface.intent import Intent, parse_intent
 from cli_interface.renderer import Renderer
 from cli_interface.keybindings import KeyBindings
 
 def build_agent(workspace:str='.'):
     agent=Orchestrator();
-    for tool in [FileReader(workspace),FileWriter(workspace),FilePatcher(workspace),DirWalker(workspace),LinterBridge(),SystemDiagnostics(),HelpSearch(workspace)]: agent.register(tool)
+    for tool in [FileReader(workspace),FileWriter(workspace),FilePatcher(workspace),DirWalker(workspace),LinterBridge(),SystemDiagnostics(),HelpSearch(workspace),RepoManager(workspace),Installer(workspace)]: agent.register(tool)
     return agent
 
 def run_command(agent, renderer: Renderer, command: str, arguments: list[str], tasks: TaskList) -> int:
@@ -78,8 +81,20 @@ def run_command(agent, renderer: Renderer, command: str, arguments: list[str], t
         return 0
     elif command == 'help':
         print(renderer.activity('completed', 'help'))
-        print(renderer.agent('Commands: diagnostics, walk PATTERN, read PATH, write PATH CONTENT, lint PATH, search QUERY, todo add/list/done/clear, time, status, /quit'))
+        print(renderer.agent('You can type naturally: "read README.md", "show Python files", "add a task to review code", "search help for tokenizer", or "install this repo yes". Exact commands: diagnostics, walk, read, write, lint, search, todo, repo, install, time, status, /quit.'))
         return 0
+    elif command == 'install':
+        result = agent.tools['install'].run({'confirm': '--confirm' in arguments})
+    elif command == 'repo':
+        operation = arguments[0] if arguments else 'status'
+        confirm = '--confirm' in arguments
+        values = [value for value in arguments[1:] if value != '--confirm']
+        payload = {'operation': operation, 'confirm': confirm}
+        if operation == 'commit':
+            payload['message'] = ' '.join(values)
+        elif operation == 'add':
+            payload['paths'] = values
+        result = agent.tools['repo'].run(payload)
     else:
         return -1
     if result.ok:
@@ -90,6 +105,17 @@ def run_command(agent, renderer: Renderer, command: str, arguments: list[str], t
     print(renderer.error(result.error or result.output or 'command failed'))
     return 1
 
+def run_request(agent, renderer: Renderer, text: str, tasks: TaskList) -> int:
+    intent = parse_intent(text)
+    if intent is not None:
+        print(renderer.activity('understood', intent.explanation))
+        return run_command(agent, renderer, intent.command, intent.arguments, tasks)
+    words = text.split()
+    command_result = run_command(agent, renderer, words[0], words[1:], tasks) if words else -1
+    if command_result >= 0:
+        return command_result
+    return -1
+
 def main(argv=None)->int:
     parser=argparse.ArgumentParser(prog='myai')
     parser.add_argument('--version', action='version', version='myai 0.1.0')
@@ -99,7 +125,7 @@ def main(argv=None)->int:
     agent=build_agent(args.workspace); renderer=Renderer(); keys=KeyBindings(); tasks=TaskList(args.workspace)
     if args.task:
         command = args.task[0]
-        command_result = run_command(agent, renderer, command, args.task[1:], tasks)
+        command_result = run_request(agent, renderer, ' '.join(args.task), tasks)
         if command_result >= 0:
             return command_result
         task=' '.join(args.task)
@@ -119,8 +145,7 @@ def main(argv=None)->int:
         if action=='quit': return 0
         if action=='multiline': print('multiline='+str(keys.multiline)); continue
         if not line.strip(): continue
-        words=line.split()
-        command_result=run_command(agent, renderer, words[0], words[1:], tasks)
+        command_result=run_request(agent, renderer, line, tasks)
         if command_result >= 0: continue
         print(renderer.activity('accepted', line))
         response=agent.run(line)
