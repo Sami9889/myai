@@ -1,8 +1,10 @@
 from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
+from pathlib import Path
 from agent_runtime.orchestrator import Orchestrator
 from agent_runtime.task_list import TaskList
+from core_engine.model_loader import load_local_model
 from tools.file_reader import FileReader
 from tools.file_writer import FileWriter
 from tools.file_patcher import FilePatcher
@@ -12,12 +14,15 @@ from tools.system_diagnostics import SystemDiagnostics
 from tools.help_search import HelpSearch
 from tools.repo_manager import RepoManager
 from tools.installer import Installer
+from utils.config_loader import load_config
 from cli_interface.intent import Intent, parse_intent
 from cli_interface.renderer import Renderer
 from cli_interface.keybindings import KeyBindings
 
 def build_agent(workspace:str='.'):
-    agent=Orchestrator();
+    config = load_config(Path(workspace) / "config.json")
+    model = load_local_model(config)
+    agent=Orchestrator(model=model)
     for tool in [FileReader(workspace),FileWriter(workspace),FilePatcher(workspace),DirWalker(workspace),LinterBridge(),SystemDiagnostics(),HelpSearch(workspace),RepoManager(workspace),Installer(workspace)]: agent.register(tool)
     return agent
 
