@@ -92,7 +92,7 @@ Please read the README and tell me what this project is.
 I am here, what should we work on?
 ```
 
-The runtime accepts raw model weights through the documented binary parser, but it does not ship model weights. Configure `config.json` with a compatible local model before requesting neural generation. Without weights, the CLI remains useful for safe file inspection, AST analysis, diagnostics, and deterministic tool orchestration.
+The runtime accepts raw model weights through the documented binary parser. A default local model is included in `models/`, so neural generation works out of the box after installation. You can replace `models/local_model.bin` with trained weights for better results.
 
 ## Development
 
