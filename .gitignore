@@ -149,6 +149,8 @@ activemq-data/
 
 # Environments
 .env
+.myai-tasks.json
+.myai-update.lock/
 .envrc
 .venv
 env/

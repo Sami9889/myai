@@ -52,7 +52,13 @@ class Orchestrator:
         self.messages.append({'role':'tool','content':json.dumps({'name':name,'ok':result.ok,'output':result.output,'error':result.error})})
         return result
     def _fallback(self,task:str)->str:
-        return 'No model weights are configured. Task received: '+task
+        return (
+            'Task received: ' + task + '\n\n'
+            'Neural generation is unavailable because config.json has no local '
+            'model path configured. The CLI is online and its deterministic '
+            'workspace tools are ready. Try `diagnostics`, `walk *.py`, '
+            '`read README.md`, or `lint PATH`.'
+        )
     def _reflect(self,task:str,answer:str,results:list[ToolResult])->str:
         failures=sum(not item.ok for item in results)
         if failures: return f'{answer}\n\nRecovery: {failures} tool operation(s) failed; inspect the reported errors before retrying.'
