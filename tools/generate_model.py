@@ -21,11 +21,11 @@ model_dir.mkdir(exist_ok=True)
 tokenizer_path = model_dir / "tokenizer.json"
 tokenizer_path.write_text(json.dumps(tokenizer, indent=2), encoding="utf-8")
 
-hidden_size = 64
+hidden_size = 8
 vocab_size = len(vocab)
-layers = 2
+layers = 1
 heads = 2
-context_length = 128
+context_length = 16
 
 weights: dict[str, Tensor] = {}
 

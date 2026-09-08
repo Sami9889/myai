@@ -52,10 +52,17 @@ class Orchestrator:
         result=tool.run(arguments)
         self.messages.append({'role':'tool','content':json.dumps({'name':name,'ok':result.ok,'output':result.output,'error':result.error})})
         return result
-    def _fallback(self,task:str)->str:
+    def _fallback(self,task:str,model_configured:bool=False)->str:
         conversational = local_reply(task)
         if conversational is not None:
             return conversational
+        if model_configured:
+            return (
+                'Task received: ' + task + '\n\n'
+                'The local model is configured but produced unreadable output. '
+                'The CLI remains useful for deterministic workspace tools. '
+                'Try `diagnostics`, `walk *.py`, `read README.md`, or `lint PATH`.'
+            )
         return (
             'Task received: ' + task + '\n\n'
             'Neural generation is unavailable because config.json has no local '
@@ -69,10 +76,16 @@ class Orchestrator:
         return answer
     def run(self,task:str)->AgentResponse:
         self.state=SessionState(task=task); self.messages=[{'role':'system','content':'You are a local-only agent. Use <tool name="name">{json}</tool> for tools.'},{'role':'user','content':task}]; results=[]; seen:dict[str,int]={}; answer=''
+        model_configured = self.model is not None
         for _ in range(max(1,self.config.max_steps)):
             self.state.transition(SessionStatus.THINKING)
             context=self.compressor.compress(self.messages)
-            generated=self.model(context) if self.model else self._fallback(task)
+            generated=self.model(context) if self.model else self._fallback(task, model_configured)
+            if generated is None:
+                generated = self._fallback(task, model_configured)
+                self.messages.append({'role':'assistant','content':generated})
+                self.state.transition(SessionStatus.COMPLETE)
+                return AgentResponse(self._reflect(task,generated,results),self.state,results)
             calls=self._parse_calls(generated)
             if not calls:
                 answer=generated; self.messages.append({'role':'assistant','content':generated}); self.state.transition(SessionStatus.COMPLETE); return AgentResponse(self._reflect(task,answer,results),self.state,results)

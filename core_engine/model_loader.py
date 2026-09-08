@@ -115,7 +115,16 @@ def load_local_model(config: dict) -> Callable[[list[dict[str, str]]], str] | No
 
     EOS_TOKEN = tokenizer.vocabulary.get("<eos>")
 
-    def model(messages: list[dict[str, str]]) -> str:
+    def _is_readable(text: str) -> bool:
+        if not text:
+            return False
+        text = text.strip()
+        if not text:
+            return False
+        printable = sum(ch.isprintable() or ch.isspace() for ch in text)
+        return printable / max(1, len(text)) >= 0.7
+
+    def model(messages: list[dict[str, str]]) -> str | None:
         prompt = "\n".join(
             f"{m.get('role', 'user')}: {m.get('content', '')}"
             for m in messages
@@ -134,6 +143,7 @@ def load_local_model(config: dict) -> Callable[[list[dict[str, str]]], str] | No
                 break
 
         new_ids = generated[len(token_ids):]
-        return tokenizer.decode(new_ids)
+        text = tokenizer.decode(new_ids)
+        return text if _is_readable(text) else None
 
     return model
