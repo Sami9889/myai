@@ -17,5 +17,22 @@
     "confirm_shell": true,
     "allow_network": false,
     "workspace": "."
-  }
+  },
+  "coding_prompts": [
+    "write a Python function to sort a list",
+    "implement a linked list in Python",
+    "create a REST API endpoint in Flask",
+    "write a Dockerfile for a Python app",
+    "refactor this function for readability",
+    "add type hints to this module",
+    "write unit tests for this class",
+    "optimize this SQL query",
+    "implement a binary search algorithm",
+    "create a React component for a todo list",
+    "write a shell script to backup a database",
+    "implement a retry decorator with exponential backoff",
+    "create a middleware for authentication",
+    "write a CSV parser with error handling",
+    "implement a priority queue using a heap"
+  ]
 }
