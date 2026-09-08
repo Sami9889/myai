@@ -1,0 +1,5 @@
+{
+  "model": {"path": "", "context_length": 2048, "hidden_size": 256, "layers": 4, "heads": 4},
+  "runtime": {"max_steps": 32, "temperature": 0.7, "top_k": 40, "top_p": 0.9},
+  "security": {"confirm_shell": true, "allow_network": false, "workspace": "."}
+}

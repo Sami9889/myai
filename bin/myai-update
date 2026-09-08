@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REMOTE_URL="${MYAI_REMOTE_URL:-https://github.com/Sami9889/myai.git}"
+BRANCH="${MYAI_BRANCH:-main}"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+PROJECT_ROOT="${MYAI_PROJECT_ROOT:-$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)}"
+INTERVAL="${MYAI_UPDATE_INTERVAL:-300}"
+ONCE=0
+
+usage() {
+  printf 'Usage: myai-update [--once] [--interval SECONDS]\n'
+  printf '  --once             Check and apply one update, then exit\n'
+  printf '  --interval SECONDS Poll interval (default: 300)\n'
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --once) ONCE=1; shift ;;
+    --interval)
+      [[ $# -ge 2 ]] || { printf '%s\n' '--interval requires seconds' >&2; exit 2; }
+      INTERVAL="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[[ "$INTERVAL" =~ ^[1-9][0-9]*$ ]] || { printf 'interval must be a positive integer\n' >&2; exit 2; }
+command -v git >/dev/null 2>&1 || { printf 'git is required\n' >&2; exit 1; }
+
+if [[ ! -d "$PROJECT_ROOT/.git" ]]; then
+  mkdir -p "$(dirname "$PROJECT_ROOT")"
+  git clone --branch "$BRANCH" --single-branch "$REMOTE_URL" "$PROJECT_ROOT"
+fi
+
+LOCK_DIR="$PROJECT_ROOT/.myai-update.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  printf 'another myai update is already running\n' >&2
+  exit 0
+fi
+trap 'rmdir "$LOCK_DIR"' EXIT
+
+update_once() {
+  cd "$PROJECT_ROOT"
+  [[ "$(git branch --show-current)" == "$BRANCH" ]] || { printf 'refusing: checkout is not on %s\n' "$BRANCH" >&2; return 1; }
+  [[ -z "$(git status --porcelain)" ]] || { printf 'skipped: local changes are present\n'; return 0; }
+
+  local before after
+  before="$(git rev-parse HEAD)"
+  git fetch --quiet origin "$BRANCH"
+  after="$(git rev-parse "origin/$BRANCH")"
+  if [[ "$before" == "$after" ]]; then
+    printf 'myai is up to date at %.12s\n' "$after"
+    return 0
+  fi
+
+  git merge --ff-only --quiet "origin/$BRANCH"
+  ./install.sh
+  printf 'myai updated from %.12s to %.12s\n' "$before" "$after"
+}
+
+if (( ONCE )); then
+  update_once
+  exit $?
+fi
+
+printf 'watching %s/%s every %ss; press Ctrl-C to stop\n' "$REMOTE_URL" "$BRANCH" "$INTERVAL"
+while true; do
+  update_once || exit $?
+  if (( ONCE )); then exit 0; fi
+  sleep "$INTERVAL"
+done
