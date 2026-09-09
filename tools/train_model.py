@@ -42,9 +42,9 @@ def log_memory(label: str = '') -> None:
     except Exception:
         pass
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 1: Web search + webpage read
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_web_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     search = WebSearch(allow_network=True, timeout=20)
     reader = WebReader(allow_network=True, timeout=20)
@@ -91,9 +91,9 @@ def fetch_web_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 2: Wikipedia articles
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_wikipedia_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     from urllib.parse import urlencode
     from urllib.request import Request, urlopen
@@ -180,9 +180,9 @@ def fetch_wikipedia_text(queries: list[str], max_chars: int = 12000) -> tuple[st
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 3: Stack Exchange / Stack Overflow
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_stackexchange_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     from urllib.parse import urlencode
     from urllib.request import Request, urlopen
@@ -228,9 +228,9 @@ def fetch_stackexchange_text(queries: list[str], max_chars: int = 12000) -> tupl
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 4: arXiv papers
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_arxiv_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     from urllib.parse import urlencode
     from urllib.request import Request, urlopen
@@ -273,9 +273,9 @@ def fetch_arxiv_text(queries: list[str], max_chars: int = 12000) -> tuple[str, i
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 5: GitHub repositories
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_github_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     from urllib.parse import urlencode
     from urllib.request import Request, urlopen
@@ -331,9 +331,9 @@ def fetch_github_text(queries: list[str], max_chars: int = 12000) -> tuple[str, 
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 6: Hacker News
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_hackernews_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     from urllib.request import Request, urlopen
 
@@ -374,9 +374,9 @@ def fetch_hackernews_text(queries: list[str], max_chars: int = 12000) -> tuple[s
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Source 7: Reddit posts
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_reddit_text(queries: list[str], max_chars: int = 12000) -> tuple[str, int]:
     from urllib.parse import urlencode
     from urllib.request import Request, urlopen
@@ -425,9 +425,9 @@ def fetch_reddit_text(queries: list[str], max_chars: int = 12000) -> tuple[str, 
     text = '\n\n'.join(parts)
     return text[:max_chars], fetched
 
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 # Main fetcher: combines all sources
-# ──────────────────────────────────────────────────────────────
+# --------------------------------------------------------------
 def fetch_training_text(queries: list[str], max_chars: int = 20000) -> str:
     sources = [
         ('web', fetch_web_text, 0.20),
