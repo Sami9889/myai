@@ -12,8 +12,23 @@ on:
         required: false
         default: 'Python programming,artificial intelligence,machine learning,software engineering,data structures,web development,computer science'
         type: string
+      epochs:
+        description: 'How many full passes over the training data to perform'
+        required: false
+        default: '5'
+        type: number
+      learning_rate:
+        description: 'Step size for gradient updates. Lower = slower/more stable, higher = faster/more aggressive'
+        required: false
+        default: '0.05'
+        type: string
+      max_chars:
+        description: 'Maximum characters of web text to fetch for training'
+        required: false
+        default: '20000'
+        type: number
       time_limit_minutes:
-        description: 'Maximum training time in minutes'
+        description: 'Maximum workflow runtime in minutes'
         required: false
         default: '120'
         type: number
@@ -40,6 +55,9 @@ jobs:
       - name: Show training configuration
         run: |
           echo "Training queries: ${{ inputs.training_queries }}"
+          echo "Epochs: ${{ inputs.epochs || 5 }}"
+          echo "Learning rate: ${{ inputs.learning_rate || 0.05 }}"
+          echo "Max chars: ${{ inputs.max_chars || 20000 }}"
           echo "Time limit: ${{ inputs.time_limit_minutes || 120 }} minutes"
           echo "Runner: ${{ runner.os }}"
           echo "Python: $(python3 --version)"
@@ -57,10 +75,16 @@ jobs:
         env:
           PYTHONPATH: .
           TRAINING_QUERIES: ${{ inputs.training_queries }}
+          EPOCHS: ${{ inputs.epochs || 5 }}
+          LEARNING_RATE: ${{ inputs.learning_rate || 0.05 }}
+          MAX_CHARS: ${{ inputs.max_chars || 20000 }}
           TIME_LIMIT_MINUTES: ${{ inputs.time_limit_minutes || 120 }}
         run: |
           echo "Starting training..."
           echo "Queries: $TRAINING_QUERIES"
+          echo "Epochs: $EPOCHS"
+          echo "Learning rate: $LEARNING_RATE"
+          echo "Max chars: $MAX_CHARS"
           echo "Time limit: $TIME_LIMIT_MINUTES minutes"
           python3 tools/train_model.py
 

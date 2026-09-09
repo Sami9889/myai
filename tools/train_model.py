@@ -88,13 +88,37 @@ def main() -> None:
     else:
         queries = DEFAULT_QUERIES
 
+    epochs_raw = os.environ.get('EPOCHS', '5').strip()
+    try:
+        epochs = max(1, int(epochs_raw))
+    except ValueError:
+        epochs = 5
+
+    lr_raw = os.environ.get('LEARNING_RATE', '0.05').strip()
+    try:
+        learning_rate = max(1e-6, float(lr_raw))
+    except ValueError:
+        learning_rate = 0.05
+
+    max_chars_raw = os.environ.get('MAX_CHARS', '20000').strip()
+    try:
+        max_chars = max(1000, int(max_chars_raw))
+    except ValueError:
+        max_chars = 20000
+
     time_limit_raw = os.environ.get('TIME_LIMIT_MINUTES', '120').strip()
     try:
         time_limit_minutes = int(time_limit_raw)
     except ValueError:
         time_limit_minutes = 120
 
-    log(f'⏱️ Time limit: {time_limit_minutes} minutes')
+    log('📋 Configuration:')
+    log(f'   Queries: {len(queries)} topics')
+    log(f'   Epochs: {epochs}')
+    log(f'   Learning rate: {learning_rate}')
+    log(f'   Max chars: {max_chars}')
+    log(f'   Time limit: {time_limit_minutes} minutes')
+
     start_time = time.time()
 
     log('📚 Loading tokenizer...')
@@ -102,7 +126,7 @@ def main() -> None:
     log(f'✅ Tokenizer loaded (vocab size: {tokenizer.vocabulary_size})')
 
     log('🌐 Fetching training text...')
-    text = fetch_training_text(queries, max_chars=20000)
+    text = fetch_training_text(queries, max_chars=max_chars)
     elapsed = time.time() - start_time
     log(f'✅ Fetched {len(text)} characters in {elapsed:.1f}s')
 
@@ -128,8 +152,8 @@ def main() -> None:
             model_path=model_path,
             tokenizer=tokenizer,
             texts=texts,
-            epochs=5,
-            lr=0.05,
+            epochs=epochs,
+            lr=learning_rate,
             seed=42,
         )
     except Exception as exc:
