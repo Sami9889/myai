@@ -36,7 +36,7 @@ on:
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.time_limit_minutes || 120 }}
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
