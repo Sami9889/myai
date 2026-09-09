@@ -2,6 +2,7 @@
 from __future__ import annotations
 import math
 import random
+import time
 from typing import Callable, Sequence
 from .tensor_ops import Tensor
 from .weights_parser import write_weights, WeightFile
@@ -106,17 +107,22 @@ def train_on_text(
     epochs: int = 3,
     lr: float = 0.01,
     seed: int | None = None,
+    progress_callback=None,
 ) -> None:
     rng = random.Random(seed)
     model_path = Path(model_path)
     with WeightFile(model_path) as wf:
         records = {name: wf.read(name) for name in wf.names()}
 
+    total_texts = len(texts)
     for epoch in range(epochs):
         rng.shuffle(texts)
         epoch_loss = 0.0
         steps = 0
-        for text in texts:
+        epoch_start = time.time()
+        if progress_callback:
+            progress_callback('epoch_start', epoch=epoch + 1, epochs=epochs, total_texts=total_texts)
+        for text_index, text in enumerate(texts, 1):
             tokens = tokenizer.encode(text)
             if len(tokens) < 2:
                 continue
@@ -124,8 +130,14 @@ def train_on_text(
             loss = train_step(transformer, tokenizer, tokens, lr=lr)
             epoch_loss += loss
             steps += 1
+            if progress_callback and steps % 5 == 0:
+                progress_callback('step', epoch=epoch + 1, epochs=epochs, text_index=text_index, total_texts=total_texts, loss=loss)
         avg = epoch_loss / max(1, steps)
-        print(f'epoch {epoch + 1}/{epochs} loss={avg:.4f}')
+        epoch_elapsed = time.time() - epoch_start
+        if progress_callback:
+            progress_callback('epoch_end', epoch=epoch + 1, epochs=epochs, loss=avg, elapsed=epoch_elapsed, steps=steps)
+        else:
+            print(f'epoch {epoch + 1}/{epochs} loss={avg:.4f} steps={steps} time={epoch_elapsed:.1f}s')
 
     write_weights(model_path, records)
 

@@ -72,6 +72,37 @@ def fetch_training_text(queries: list[str], max_chars: int = 20000) -> str:
     text = '\n\n'.join(parts)
     return text[:max_chars]
 
+def make_progress_logger():
+    epoch_start = None
+    def progress_callback(event, **kwargs):
+        nonlocal epoch_start
+        if event == 'epoch_start':
+            epoch = kwargs['epoch']
+            epochs = kwargs['epochs']
+            total_texts = kwargs['total_texts']
+            epoch_start = time.time()
+            log(f'━' * 60)
+            log(f'🧠 Epoch {epoch}/{epochs} started ({total_texts} texts)')
+            log(f'━' * 60)
+        elif event == 'step':
+            epoch = kwargs['epoch']
+            epochs = kwargs['epochs']
+            text_index = kwargs['text_index']
+            total_texts = kwargs['total_texts']
+            loss = kwargs['loss']
+            pct = text_index / total_texts * 100
+            log(f'  [{epoch}/{epochs}] step {text_index}/{total_texts} ({pct:.0f}%) loss={loss:.4f}')
+        elif event == 'epoch_end':
+            epoch = kwargs['epoch']
+            epochs = kwargs['epochs']
+            loss = kwargs['loss']
+            elapsed = kwargs['elapsed']
+            steps = kwargs['steps']
+            log(f'━' * 60)
+            log(f'✅ Epoch {epoch}/{epochs} complete | loss={loss:.4f} | steps={steps} | time={elapsed:.1f}s')
+            log(f'━' * 60)
+    return progress_callback
+
 def main() -> None:
     log('=' * 60)
     log('🚀 Starting training pipeline')
@@ -148,6 +179,7 @@ def main() -> None:
     log('🧠 Training model...')
     train_start = time.time()
     try:
+        progress = make_progress_logger()
         train_on_text(
             model_path=model_path,
             tokenizer=tokenizer,
@@ -155,6 +187,7 @@ def main() -> None:
             epochs=epochs,
             lr=learning_rate,
             seed=42,
+            progress_callback=progress,
         )
     except Exception as exc:
         log(f'❌ Training failed: {exc}')
