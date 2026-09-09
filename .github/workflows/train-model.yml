@@ -1,0 +1,57 @@
+name: Train Local Model
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install requests
+
+      - name: Generate local model if missing
+        run: |
+          if [ ! -f models/local_model.bin ] || [ ! -f models/tokenizer.json ]; then
+            PYTHONPATH=. python3 tools/generate_model.py
+          fi
+
+      - name: Train model on web data
+        env:
+          PYTHONPATH: .
+        run: |
+          python3 tools/train_model.py
+
+      - name: Upload trained model
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: |
+            models/local_model.bin
+            models/tokenizer.json
+          retention-days: 30
+
+      - name: Commit trained weights
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add models/local_model.bin models/tokenizer.json
+          git diff --cached --quiet || git commit -m "chore(model): retrain local model weights"
+          git push origin main
