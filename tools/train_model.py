@@ -33,7 +33,11 @@ def log_memory(label: str = '') -> None:
     try:
         import resource
         usage = resource.getrusage(resource.RUSAGE_SELF)
-        mem_mb = usage.ru_maxrss / 1024 / 1024
+        mem_kb = usage.ru_maxrss
+        if sys.platform == 'linux':
+            mem_mb = mem_kb / 1024
+        else:
+            mem_mb = mem_kb / 1024 / 1024
         log(f'[mem] {label} rss={mem_mb:.1f} MB')
     except Exception:
         pass

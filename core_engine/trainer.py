@@ -2,6 +2,7 @@
 from __future__ import annotations
 import math
 import random
+import sys
 import time
 from typing import Callable, Sequence
 from .tensor_ops import Tensor
@@ -104,7 +105,11 @@ def _log_memory(label: str = '') -> None:
     try:
         import resource
         usage = resource.getrusage(resource.RUSAGE_SELF)
-        mem_mb = usage.ru_maxrss / 1024 / 1024
+        mem_kb = usage.ru_maxrss
+        if sys.platform == 'linux':
+            mem_mb = mem_kb / 1024
+        else:
+            mem_mb = mem_kb / 1024 / 1024
         print(f'[mem] {label} rss={mem_mb:.1f} MB', flush=True)
     except Exception:
         pass
