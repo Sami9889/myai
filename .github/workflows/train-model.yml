@@ -86,7 +86,7 @@ jobs:
           echo "Learning rate: $LEARNING_RATE"
           echo "Max chars: $MAX_CHARS"
           echo "Time limit: $TIME_LIMIT_MINUTES minutes"
-          echo "Sources: Bing, Wikipedia, Stack Overflow, arXiv, GitHub, Hacker News, Reddit"
+          echo "Sources: Web, Wikipedia, Stack Overflow, arXiv, GitHub, Hacker News, Reddit, Wiktionary, Wikiquote, Wikidata, OpenLibrary, PubMed, CrossRef, Europe PMC, Nominatim, REST Countries, Wikipedia Random, DuckDuckGo, Open Trivia DB, JokeAPI, Cat Facts, Dog Facts, Bored API, Advice Slip, Kanye Rest, Random User, Random Data, Numbers API, IP API, Timezone API, Holiday API, Exchange Rate API, CoinGecko, CoinCap, MetaWeather, MealDB, Cocktail DB, Open Food Facts, PubChem, ChEMBL, ClinicalTrials, Launch Library, SpaceX, ISS, Earthquake, Wikimedia Commons, Wikisource, Wikinews, Wikivoyage"
           python3 tools/train_model.py
 
       - name: Upload trained model
@@ -100,9 +100,12 @@ jobs:
 
       - name: Commit trained weights
         if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/Sami9889/myai.git
           git add models/local_model.bin models/tokenizer.json
           git diff --cached --quiet || git commit -m "chore(model): retrain local model weights"
           git push origin main
