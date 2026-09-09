@@ -115,6 +115,9 @@ def train_on_text(
         records = {name: wf.read(name) for name in wf.names()}
 
     total_texts = len(texts)
+    transformer = _build_transformer_from_records(records, tokenizer)
+    step_times: list[float] = []
+
     for epoch in range(epochs):
         rng.shuffle(texts)
         epoch_loss = 0.0
@@ -126,12 +129,17 @@ def train_on_text(
             tokens = tokenizer.encode(text)
             if len(tokens) < 2:
                 continue
-            transformer = _build_transformer_from_records(records, tokenizer)
+            step_start = time.time()
             loss = train_step(transformer, tokenizer, tokens, lr=lr)
+            step_elapsed = time.time() - step_start
+            step_times.append(step_elapsed)
+            if len(step_times) > 20:
+                step_times.pop(0)
             epoch_loss += loss
             steps += 1
-            if progress_callback and steps % 5 == 0:
-                progress_callback('step', epoch=epoch + 1, epochs=epochs, text_index=text_index, total_texts=total_texts, loss=loss)
+            if progress_callback:
+                avg_step = sum(step_times) / len(step_times)
+                progress_callback('step', epoch=epoch + 1, epochs=epochs, text_index=text_index, total_texts=total_texts, loss=loss, step_time=step_elapsed, avg_step_time=avg_step)
         avg = epoch_loss / max(1, steps)
         epoch_elapsed = time.time() - epoch_start
         if progress_callback:
