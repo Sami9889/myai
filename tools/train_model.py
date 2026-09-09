@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -28,11 +29,99 @@ DEFAULT_QUERIES = [
 def log(msg: str) -> None:
     print(msg, flush=True)
 
+def fetch_wikipedia_text(queries: list[str], max_chars: int = 12000) -> str:
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+    from html.parser import HTMLParser
+
+    class _TextExtractor(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self._skip = False
+            self._parts: list[str] = []
+            self._skip_tags = {'script', 'style', 'nav', 'header', 'footer', 'aside'}
+
+        def handle_starttag(self, tag: str, attrs: list) -> None:
+            if tag in self._skip_tags:
+                self._skip = True
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag in self._skip_tags:
+                self._skip = False
+
+        def handle_data(self, data: str) -> None:
+            if not self._skip:
+                text = data.strip()
+                if text:
+                    self._parts.append(text)
+
+        def get_text(self) -> str:
+            return '\n'.join(self._parts)
+
+    seen_titles: set[str] = set()
+    parts: list[str] = []
+
+    for query in queries:
+        log(f'  [wiki] searching articles for: {query}')
+        try:
+            search_url = 'https://en.wikipedia.org/w/api.php?' + urlencode({
+                'action': 'query',
+                'list': 'search',
+                'srsearch': query,
+                'srlimit': 3,
+                'format': 'json',
+            })
+            req = Request(search_url, headers={'User-Agent': 'myai-trainer/0.1 (research)'})
+            with urlopen(req, timeout=20) as response:
+                search_data = json.loads(response.read().decode('utf-8'))
+            pages = search_data.get('query', {}).get('search', [])
+            if not pages:
+                log(f'  [warn] no Wikipedia articles found for: {query}')
+                continue
+            for page in pages:
+                title = page.get('title', '')
+                if not title or title in seen_titles:
+                    continue
+                seen_titles.add(title)
+                try:
+                    article_url = 'https://en.wikipedia.org/wiki/' + urlencode({'title': title})[7:]
+                    article_url = 'https://en.wikipedia.org/wiki/' + title.replace(' ', '_')
+                    log(f'  [wiki] fetching article: {title}')
+                    req = Request(article_url, headers={'User-Agent': 'myai-trainer/0.1 (research)'})
+                    with urlopen(req, timeout=20) as response:
+                        raw = response.read()
+                    html = raw.decode('utf-8', errors='replace')
+                    extractor = _TextExtractor()
+                    extractor.feed(html)
+                    text = extractor.get_text()
+                    text = re.sub(r'\n{3,}', '\n\n', text)
+                    if text:
+                        parts.append(text)
+                        log(f'  [info] Wikipedia article fetched: {len(text)} chars')
+                    else:
+                        log(f'  [warn] Wikipedia article empty: {title}')
+                    if sum(len(p) for p in parts) >= max_chars:
+                        break
+                except Exception as exc:
+                    log(f'  [warn] Wikipedia article fetch failed: {title} | {exc}')
+                    continue
+            if sum(len(p) for p in parts) >= max_chars:
+                break
+        except Exception as exc:
+            log(f'  [warn] Wikipedia search failed: {query} | {exc}')
+            continue
+
+    result = '\n\n'.join(parts)
+    return result[:max_chars]
+
 def fetch_training_text(queries: list[str], max_chars: int = 20000) -> str:
     search = WebSearch(allow_network=True, timeout=20)
     reader = WebReader(allow_network=True, timeout=20)
     seen_urls: set[str] = set()
     parts: list[str] = []
+
+    web_budget = max(1000, max_chars // 2)
+    wiki_budget = max_chars - web_budget
 
     for query in queries:
         log(f'[search] query="{query}"')
@@ -56,21 +145,28 @@ def fetch_training_text(queries: list[str], max_chars: int = 20000) -> str:
                         if read_result.ok and read_result.output:
                             parts.append(read_result.output)
                             log(f'  [info] fetched {len(read_result.output)} chars')
-                            if sum(len(p) for p in parts) >= max_chars:
+                            if sum(len(p) for p in parts) >= web_budget:
                                 break
                         else:
                             log(f'  [warn] fetch failed: {read_result.error}')
                     except Exception as exc:
                         log(f'  [warn] fetch error: {exc}')
                         continue
-            if sum(len(p) for p in parts) >= max_chars:
+            if sum(len(p) for p in parts) >= web_budget:
                 break
         except Exception as exc:
             log(f'  [warn] search error: {exc}')
             continue
 
-    text = '\n\n'.join(parts)
-    return text[:max_chars]
+    web_text = '\n\n'.join(parts)
+    log(f'[data] web source chars={len(web_text)}')
+
+    log('[data] fetching Wikipedia articles...')
+    wiki_text = fetch_wikipedia_text(queries, max_chars=wiki_budget)
+    log(f'[data] wikipedia source chars={len(wiki_text)}')
+
+    combined = '\n\n'.join(filter(None, [web_text, wiki_text]))
+    return combined[:max_chars]
 
 def make_progress_logger():
     epoch_start = None
@@ -160,6 +256,7 @@ def main() -> None:
     text = fetch_training_text(queries, max_chars=max_chars)
     elapsed = time.time() - start_time
     log(f'[data] fetched {len(text)} chars in {elapsed:.1f}s')
+    log(f'[data] source=web+wikipedia')
 
     if not text:
         log('[warn] no training text fetched; using fallback text')
