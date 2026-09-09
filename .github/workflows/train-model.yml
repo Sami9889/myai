@@ -64,6 +64,7 @@ jobs:
           echo "Runner: ${{ runner.os }}"
           echo "Python: $(python3 --version)"
           echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+          echo "PAT secret set: ${{ secrets.PAT != '' }}"
 
       - name: Generate local model if missing
         run: |

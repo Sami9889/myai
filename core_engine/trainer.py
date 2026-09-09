@@ -100,6 +100,15 @@ def train_step(
 
     return total_loss / max(1, count)
 
+def _log_memory(label: str = '') -> None:
+    try:
+        import resource
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+        mem_mb = usage.ru_maxrss / 1024 / 1024
+        print(f'[mem] {label} rss={mem_mb:.1f} MB', flush=True)
+    except Exception:
+        pass
+
 def train_on_text(
     model_path: str | Path,
     tokenizer,
@@ -111,8 +120,10 @@ def train_on_text(
 ) -> None:
     rng = random.Random(seed)
     model_path = Path(model_path)
+    _log_memory('before_load')
     with WeightFile(model_path) as wf:
         records = {name: wf.read(name) for name in wf.names()}
+    _log_memory('after_load')
 
     total_texts = len(texts)
     transformer = _build_transformer_from_records(records, tokenizer)
@@ -147,7 +158,9 @@ def train_on_text(
         else:
             print(f'epoch {epoch + 1}/{epochs} loss={avg:.4f} steps={steps} time={epoch_elapsed:.1f}s')
 
+    _log_memory('before_save')
     write_weights(model_path, records)
+    _log_memory('after_save')
 
 def _build_transformer_from_records(records, tokenizer):
     from core_engine.transformer import TransformerConfig, DecoderTransformer, TransformerBlock, CausalSelfAttention, FeedForward, Linear, RMSNorm
