@@ -86,7 +86,7 @@ jobs:
           echo "Learning rate: $LEARNING_RATE"
           echo "Max chars: $MAX_CHARS"
           echo "Time limit: $TIME_LIMIT_MINUTES minutes"
-          echo "Sources: Bing search + Wikipedia articles"
+          echo "Sources: Bing, Wikipedia, Stack Overflow, arXiv, GitHub, Hacker News, Reddit"
           python3 tools/train_model.py
 
       - name: Upload trained model
