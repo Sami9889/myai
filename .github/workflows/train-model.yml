@@ -6,11 +6,22 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      training_queries:
+        description: 'Comma-separated search queries/topics to train on'
+        required: false
+        default: 'Python programming,artificial intelligence,machine learning,software engineering,data structures,web development,computer science'
+        type: string
+      time_limit_minutes:
+        description: 'Maximum training time in minutes'
+        required: false
+        default: '120'
+        type: number
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.time_limit_minutes || 120 }}
 
     steps:
       - name: Checkout repository
@@ -26,16 +37,31 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install requests
 
+      - name: Show training configuration
+        run: |
+          echo "Training queries: ${{ inputs.training_queries }}"
+          echo "Time limit: ${{ inputs.time_limit_minutes || 120 }} minutes"
+          echo "Runner: ${{ runner.os }}"
+          echo "Python: $(python3 --version)"
+
       - name: Generate local model if missing
         run: |
           if [ ! -f models/local_model.bin ] || [ ! -f models/tokenizer.json ]; then
+            echo "Generating local model..."
             PYTHONPATH=. python3 tools/generate_model.py
+          else
+            echo "Local model already exists, skipping generation."
           fi
 
       - name: Train model on web data
         env:
           PYTHONPATH: .
+          TRAINING_QUERIES: ${{ inputs.training_queries }}
+          TIME_LIMIT_MINUTES: ${{ inputs.time_limit_minutes || 120 }}
         run: |
+          echo "Starting training..."
+          echo "Queries: $TRAINING_QUERIES"
+          echo "Time limit: $TIME_LIMIT_MINUTES minutes"
           python3 tools/train_model.py
 
       - name: Upload trained model
