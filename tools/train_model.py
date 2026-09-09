@@ -35,13 +35,13 @@ def fetch_training_text(queries: list[str], max_chars: int = 20000) -> str:
     parts: list[str] = []
 
     for query in queries:
-        log(f'🔍 Searching: {query}')
+        log(f'[search] query="{query}"')
         try:
             result = search.run({'query': query, 'num_results': 5})
             if not result.ok:
-                log(f'  ⚠️ Search failed: {result.error}')
+                log(f'  [warn] search failed: {result.error}')
                 continue
-            log(f'  ✅ Got search results')
+            log(f'  [info] search results received')
             for line in result.output.splitlines():
                 if line.startswith('   ') and not line.startswith('   http'):
                     parts.append(line.strip())
@@ -51,22 +51,22 @@ def fetch_training_text(queries: list[str], max_chars: int = 20000) -> str:
                         continue
                     seen_urls.add(url)
                     try:
-                        log(f'  📄 Reading: {url}')
+                        log(f'  [fetch] url="{url}"')
                         read_result = reader.run({'url': url, 'max_chars': 2000})
                         if read_result.ok and read_result.output:
                             parts.append(read_result.output)
-                            log(f'  ✅ Read {len(read_result.output)} chars')
+                            log(f'  [info] fetched {len(read_result.output)} chars')
                             if sum(len(p) for p in parts) >= max_chars:
                                 break
                         else:
-                            log(f'  ⚠️ Read failed: {read_result.error}')
+                            log(f'  [warn] fetch failed: {read_result.error}')
                     except Exception as exc:
-                        log(f'  ⚠️ Read error: {exc}')
+                        log(f'  [warn] fetch error: {exc}')
                         continue
             if sum(len(p) for p in parts) >= max_chars:
                 break
         except Exception as exc:
-            log(f'  ⚠️ Search error: {exc}')
+            log(f'  [warn] search error: {exc}')
             continue
 
     text = '\n\n'.join(parts)
@@ -81,9 +81,9 @@ def make_progress_logger():
             epochs = kwargs['epochs']
             total_texts = kwargs['total_texts']
             epoch_start = time.time()
-            log(f'━' * 60)
-            log(f'🧠 Epoch {epoch}/{epochs} started ({total_texts} texts)')
-            log(f'━' * 60)
+            log('-' * 72)
+            log(f'[train] epoch {epoch}/{epochs} started | texts={total_texts}')
+            log('-' * 72)
         elif event == 'step':
             epoch = kwargs['epoch']
             epochs = kwargs['epochs']
@@ -91,22 +91,22 @@ def make_progress_logger():
             total_texts = kwargs['total_texts']
             loss = kwargs['loss']
             pct = text_index / total_texts * 100
-            log(f'  [{epoch}/{epochs}] step {text_index}/{total_texts} ({pct:.0f}%) loss={loss:.4f}')
+            log(f'  [train] epoch={epoch}/{epochs} step={text_index}/{total_texts} ({pct:.0f}%) loss={loss:.4f}')
         elif event == 'epoch_end':
             epoch = kwargs['epoch']
             epochs = kwargs['epochs']
             loss = kwargs['loss']
             elapsed = kwargs['elapsed']
             steps = kwargs['steps']
-            log(f'━' * 60)
-            log(f'✅ Epoch {epoch}/{epochs} complete | loss={loss:.4f} | steps={steps} | time={elapsed:.1f}s')
-            log(f'━' * 60)
+            log('-' * 72)
+            log(f'[train] epoch={epoch}/{epochs} complete | loss={loss:.4f} | steps={steps} | time={elapsed:.1f}s')
+            log('-' * 72)
     return progress_callback
 
 def main() -> None:
-    log('=' * 60)
-    log('🚀 Starting training pipeline')
-    log('=' * 60)
+    log('=' * 72)
+    log('[pipeline] training started')
+    log('=' * 72)
 
     config = load_config(ROOT / 'config.json')
     model_cfg = config.get('model', {})
@@ -143,26 +143,26 @@ def main() -> None:
     except ValueError:
         time_limit_minutes = 120
 
-    log('📋 Configuration:')
-    log(f'   Queries: {len(queries)} topics')
-    log(f'   Epochs: {epochs}')
-    log(f'   Learning rate: {learning_rate}')
-    log(f'   Max chars: {max_chars}')
-    log(f'   Time limit: {time_limit_minutes} minutes')
+    log('[config]')
+    log(f'  queries={len(queries)}')
+    log(f'  epochs={epochs}')
+    log(f'  learning_rate={learning_rate}')
+    log(f'  max_chars={max_chars}')
+    log(f'  time_limit_minutes={time_limit_minutes}')
 
     start_time = time.time()
 
-    log('📚 Loading tokenizer...')
+    log('[tokenizer] loading...')
     tokenizer = ByteBPETokenizer.from_json(tokenizer_path)
-    log(f'✅ Tokenizer loaded (vocab size: {tokenizer.vocabulary_size})')
+    log(f'[tokenizer] loaded vocab_size={tokenizer.vocabulary_size}')
 
-    log('🌐 Fetching training text...')
+    log('[data] fetching training text...')
     text = fetch_training_text(queries, max_chars=max_chars)
     elapsed = time.time() - start_time
-    log(f'✅ Fetched {len(text)} characters in {elapsed:.1f}s')
+    log(f'[data] fetched {len(text)} chars in {elapsed:.1f}s')
 
     if not text:
-        log('⚠️ No training text fetched. Using fallback text.')
+        log('[warn] no training text fetched; using fallback text')
         text = '\n'.join([
             'Python is a programming language.',
             'Machine learning is a subset of artificial intelligence.',
@@ -174,9 +174,9 @@ def main() -> None:
         ] * 50)
 
     texts = [t for t in text.split('\n\n') if len(t.strip()) > 10]
-    log(f'📊 Training on {len(texts)} text chunks')
+    log(f'[data] training texts={len(texts)}')
 
-    log('🧠 Training model...')
+    log('[train] starting')
     train_start = time.time()
     try:
         progress = make_progress_logger()
@@ -190,20 +190,20 @@ def main() -> None:
             progress_callback=progress,
         )
     except Exception as exc:
-        log(f'❌ Training failed: {exc}')
+        log(f'[error] training failed: {exc}')
         raise
 
     train_elapsed = time.time() - train_start
     total_elapsed = time.time() - start_time
-    log(f'✅ Training completed in {train_elapsed:.1f}s (total: {total_elapsed:.1f}s)')
-    log(f'💾 Model saved to: {model_path}')
+    log(f'[train] completed in {train_elapsed:.1f}s | total={total_elapsed:.1f}s')
+    log(f'[model] saved to: {model_path}')
 
     if total_elapsed > time_limit_minutes * 60:
-        log(f'⚠️ Training exceeded time limit of {time_limit_minutes} minutes')
+        log(f'[warn] exceeded time limit of {time_limit_minutes} minutes')
 
-    log('=' * 60)
-    log('🎉 Training pipeline completed successfully')
-    log('=' * 60)
+    log('=' * 72)
+    log('[pipeline] training completed successfully')
+    log('=' * 72)
 
 if __name__ == '__main__':
     main()
