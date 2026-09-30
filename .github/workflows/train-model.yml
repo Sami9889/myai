@@ -44,15 +44,12 @@ jobs:
         with:
           token: ${{ secrets.PAT || '' }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install requests
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
 
       - name: Show training configuration
         run: |
@@ -62,22 +59,24 @@ jobs:
           echo "Max chars: ${{ inputs.max_chars || 20000 }}"
           echo "Time limit: ${{ inputs.time_limit_minutes || 120 }} minutes"
           echo "Runner: ${{ runner.os }}"
-          echo "Python: $(python3 --version)"
+          echo "Java: $(java -version 2>&1 | head -n 1)"
           echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
           echo "PAT secret set: ${{ secrets.PAT != '' }}"
+
+      - name: Build project
+        run: mvn package -DskipTests -q
 
       - name: Generate local model if missing
         run: |
           if [ ! -f models/local_model.bin ] || [ ! -f models/tokenizer.json ]; then
             echo "Generating local model..."
-            PYTHONPATH=. python3 tools/generate_model.py
+            java -cp target/myai-0.1.0.jar com.myai.tools.GenerateModel
           else
             echo "Local model already exists, skipping generation."
           fi
 
       - name: Train model on web data
         env:
-          PYTHONPATH: .
           TRAINING_QUERIES: ${{ inputs.training_queries }}
           EPOCHS: ${{ inputs.epochs || 5 }}
           LEARNING_RATE: ${{ inputs.learning_rate || 0.05 }}
@@ -90,8 +89,8 @@ jobs:
           echo "Learning rate: $LEARNING_RATE"
           echo "Max chars: $MAX_CHARS"
           echo "Time limit: $TIME_LIMIT_MINUTES minutes"
-          echo "Sources: 51+ sources including Bing, Wikipedia, Stack Overflow, arXiv, GitHub, Hacker News, Reddit, Wiktionary, Wikiquote, Wikidata, OpenLibrary, PubMed, CrossRef, Europe PMC, GeoNames, Nominatim, REST Countries, Open Notify, Sunrise, Wikipedia Random, DuckDuckGo, Open Trivia DB, JokeAPI, Cat Facts, Dog Facts, Bored API, Advice Slip, Kanye Rest, Random User, Random Data, Numbers API, IP API, Timezone, Exchange Rate, CoinGecko, CoinCap, MetaWeather, MealDB, Cocktail DB, Open Food Facts, PubChem, ChEMBL, ClinicalTrials, Launch Library, SpaceX, ISS, Earthquake, Wikimedia Commons, Wikisource, Wikinews, Wikivoyage"
-          python3 tools/train_model.py
+          echo "Runner: ${{ runner.os }}"
+          java -cp target/myai-0.1.0.jar com.myai.tools.TrainModel
 
       - name: Upload trained model
         uses: actions/upload-artifact@v4
