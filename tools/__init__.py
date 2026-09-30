@@ -1,1 +1,0 @@
-"""Explicitly registered system tools."""

@@ -1,11 +1,16 @@
-PYTHON ?= python3
+JAVA ?= java
+MAVEN ?= mvn
 
-.PHONY: lint install clean
+.PHONY: lint install clean package
 install:
-\t./install.sh
+	./install.sh
+
+package:
+	$(MAVEN) package -DskipTests
 
 lint:
-\t$(PYTHON) -m compileall -q core_engine agent_runtime tools cli_interface utils
+	$(MAVEN) compile -q
 
 clean:
-\trm -rf .venv build dist *.egg-info __pycache__ core_engine/__pycache__ agent_runtime/__pycache__ tools/__pycache__ cli_interface/__pycache__ utils/__pycache__
+	$(MAVEN) clean
+	rm -rf target .venv build dist *.egg-info __pycache__ .myai-tasks.json .myai-update.lock
