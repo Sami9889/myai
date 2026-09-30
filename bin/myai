@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-root="$(cd "$(dirname "$0")/.." && pwd)"
-if [[ -x "$root/.venv/bin/python" ]]; then exec "$root/.venv/bin/python" -m cli_interface.repl "$@"; fi
-exec python3 -m cli_interface.repl "$@"
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+JAVA_BIN="${JAVA_BIN:-java}"
+JAR="${PROJECT_ROOT}/target/myai-0.1.0.jar"
+
+if [[ -f "$JAR" ]]; then
+  exec "$JAVA_BIN" -jar "$JAR" "$@"
+else
+  exec "$JAVA_BIN" -cp "$PROJECT_ROOT/target/classes" com.myai.cli.Repl "$@"
+fi
