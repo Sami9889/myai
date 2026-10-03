@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 
 public class DirWalker extends BaseTool {
     public String name() { return "walk"; }
-    public String description() { return "Index files while respecting common ignore directories." }
+    public String description() { return "Index files while respecting common ignore directories."; }
 
     private Path workspace;
 
@@ -24,20 +24,28 @@ public class DirWalker extends BaseTool {
     @Override
     public ToolResult execute(Map<String, Object> arguments) throws Exception {
         String pattern = (String) arguments.get("pattern");
-        Set<String> ignored = Set.of(".git", ".venv", "__pycache__", "node_modules");
+        Set<String> ignored = Set.of(".git", ".venv", "__pycache__", "node_modules", "target", "build", "dist");
         List<String> rows = new ArrayList<>();
         try (var stream = Files.walk(workspace)) {
             stream.forEach(path -> {
-                if (path.toFile().isFile() && !ignored.contains(path.getFileName().toString())) {
+                if (path.toFile().isFile()) {
                     Path relative = workspace.relativize(path);
-                    if (matchesPattern(relative.toString(), pattern) || matchesPattern(path.getFileName().toString(), pattern)) {
+                    boolean excluded = false;
+                    for (Path part : relative) {
+                        if (ignored.contains(part.toString())) {
+                            excluded = true;
+                            break;
+                        }
+                    }
+                    if (!excluded && (matchesPattern(relative.toString(), pattern) || matchesPattern(path.getFileName().toString(), pattern))) {
                         rows.add(relative.toString().replace('\\', '/'));
                     }
                 }
             });
         }
         Collections.sort(rows);
-        return new ToolResult(true, String.join("\n", rows), null);
+        String output = rows.isEmpty() ? "No files matched " + pattern + " in this workspace." : String.join("\n", rows);
+        return new ToolResult(true, output, null);
     }
 
     private static boolean matchesPattern(String str, String pattern) {

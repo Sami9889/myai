@@ -91,7 +91,7 @@ public class Renderer {
         return paint("you> ", BOLD + CYAN);
     }
 
-    public String user(String text) { return panel(paint(" user ", CYAN), text); }
-    public String agent(String text) { return panel(paint(" agent ", GREEN), text); }
-    public String error(String text) { return panel(paint(" error ", RED), text); }
+    public String user(String text) { return panel(paint(" user ", CYAN), text, null); }
+    public String agent(String text) { return panel(paint(" agent ", GREEN), text, null); }
+    public String error(String text) { return panel(paint(" error ", RED), text, null); }
 }

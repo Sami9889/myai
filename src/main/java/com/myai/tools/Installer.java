@@ -6,7 +6,7 @@ import java.util.Map;
 
 public class Installer extends BaseTool {
     public String name() { return "install"; }
-    public String description() { return "Install the current repository into its local environment." }
+    public String description() { return "Install the current repository into its local environment."; }
 
     private Path workspace;
 
@@ -16,8 +16,8 @@ public class Installer extends BaseTool {
 
     @Override
     public Map<String, Object> validate(Map<String, Object> arguments) {
-        boolean confirm = (Boolean) arguments.getOrDefault("confirm", false);
-        if (!(confirm instanceof Boolean)) throw new IllegalArgumentException("confirm must be boolean");
+        Object value = arguments.getOrDefault("confirm", false);
+        if (!(value instanceof Boolean confirm)) throw new IllegalArgumentException("confirm must be boolean");
         return Map.of("confirm", confirm);
     }
 

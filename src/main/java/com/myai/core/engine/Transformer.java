@@ -39,6 +39,9 @@ public class Transformer {
             }
             return output;
         }
+
+        public Tensor weight() { return weight; }
+        public Tensor bias() { return bias; }
     }
 
     public static class RMSNorm {
@@ -188,11 +191,11 @@ public class Transformer {
             for (List<Double> row : sequence) {
                 normalized.add(attentionNorm.apply(row));
             }
-            List<List<Double>> attention = attention.apply(normalized);
+            List<List<Double>> attentionOutput = attention.apply(normalized);
             List<List<Double>> residual = new ArrayList<>(sequence.size());
             for (int i = 0; i < sequence.size(); i++) {
                 List<Double> row = sequence.get(i);
-                List<Double> update = attention.get(i);
+                List<Double> update = attentionOutput.get(i);
                 List<Double> combined = new ArrayList<>(row.size());
                 for (int j = 0; j < row.size(); j++) combined.add(row.get(j) + update.get(j));
                 residual.add(combined);
@@ -248,5 +251,11 @@ public class Transformer {
             if (tokenIds.isEmpty()) throw new IllegalArgumentException("at least one token required");
             return forward(tokenIds).get(tokenIds.size() - 1);
         }
+
+        public TransformerConfig config() { return config; }
+        public Tensor embeddings() { return embeddings; }
+        public List<TransformerBlock> blocks() { return Collections.unmodifiableList(blocks); }
+        public RMSNorm finalNorm() { return finalNorm; }
+        public Linear output() { return output; }
     }
 }

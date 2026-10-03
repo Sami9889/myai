@@ -9,9 +9,10 @@ import java.util.regex.Pattern;
 
 public class HelpSearch extends BaseTool {
     public String name() { return "search"; }
-    public String description() { return "Search local project documentation and source without network access." }
+    public String description() { return "Search local project documentation and source without network access."; }
 
     private Set<String> extensions = Set.of(".md", ".txt", ".py", ".toml", ".json", ".sh", ".java");
+    private static final Set<String> STOP_WORDS = Set.of("a", "an", "and", "are", "can", "do", "for", "from", "how", "i", "in", "is", "it", "me", "of", "on", "or", "the", "this", "to", "what", "where", "with");
     private Path workspace;
 
     public HelpSearch(String workspace) {
@@ -34,7 +35,7 @@ public class HelpSearch extends BaseTool {
         Matcher m = Pattern.compile("[a-z0-9_]+").matcher(query);
         while (m.find()) {
             String term = m.group();
-            if (term.length() > 1) terms.add(term);
+            if (term.length() > 1 && !STOP_WORDS.contains(term)) terms.add(term);
         }
         if (terms.isEmpty()) return new ToolResult(false, "", "search query must contain letters or numbers");
 
@@ -57,7 +58,9 @@ public class HelpSearch extends BaseTool {
                         String line = lines.get(i);
                         String lower = line.toLowerCase();
                         int score = 0;
-                        for (String term : terms) score += countOccurrences(lower, term);
+                        for (String term : terms) {
+                            score += countOccurrences(lower, term) + 4 * countOccurrences(relative.toString().toLowerCase(), term);
+                        }
                         if (score > 0) {
                             results.add(new int[]{score, relative.toString().hashCode(), i});
                         }

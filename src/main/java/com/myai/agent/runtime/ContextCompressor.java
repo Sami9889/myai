@@ -2,6 +2,7 @@ package com.myai.agent.runtime;
 
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 public class ContextCompressor {
     private int maxTokens;

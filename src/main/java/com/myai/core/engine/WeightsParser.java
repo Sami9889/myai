@@ -6,6 +6,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.util.*;
 
 public class WeightsParser {
@@ -85,7 +88,7 @@ public class WeightsParser {
             for (int i = 0; i < record.count(); i++) {
                 data[i] = buffer.getFloat();
             }
-            return new Tensor(new Tensor.Shape(record.shape()), data);
+            return new Tensor(record.shape(), data);
         }
 
         public void close() throws IOException {
@@ -95,7 +98,11 @@ public class WeightsParser {
     }
 
     public static void writeWeights(Path path, Map<String, Tensor> tensors) throws IOException {
-        try (var stream = new java.io.FileOutputStream(path.toFile())) {
+        Path target = path.toAbsolutePath().normalize();
+        Files.createDirectories(target.getParent());
+        Path temporary = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".tmp");
+        boolean moved = false;
+        try (var stream = new java.io.FileOutputStream(temporary.toFile())) {
             stream.write(MAGIC);
             stream.write(new byte[]{(byte) (tensors.size() & 0xFF), (byte) ((tensors.size() >> 8) & 0xFF), (byte) ((tensors.size() >> 16) & 0xFF), (byte) ((tensors.size() >> 24) & 0xFF)});
             for (Map.Entry<String, Tensor> entry : tensors.entrySet()) {
@@ -114,6 +121,15 @@ public class WeightsParser {
                     stream.write(bytes);
                 }
             }
+        }
+        try {
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            moved = true;
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            moved = true;
+        } finally {
+            if (!moved) Files.deleteIfExists(temporary);
         }
     }
 }

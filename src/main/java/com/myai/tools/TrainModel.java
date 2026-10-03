@@ -1,54 +1,57 @@
 package com.myai.tools;
 
+import com.myai.core.engine.Tokenizer;
+import com.myai.core.engine.Trainer;
+import com.myai.utils.ConfigLoader;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Stream;
 
 public class TrainModel {
-    private static final List<String> DEFAULT_QUERIES = List.of(
-        "Python programming language", "artificial intelligence", "machine learning",
-        "software engineering", "data structures algorithms", "web development", "computer science"
-    );
-
     public static void main(String[] args) throws Exception {
-        Path root = Path.of("").toAbsolutePath().normalize();
+        train(Path.of(""));
+    }
+
+    public static void train(Path workspace) throws Exception {
+        Path root = workspace.toAbsolutePath().normalize();
         Map<String, Object> config = ConfigLoader.loadConfig(root.resolve("config.json").toString());
         Map<String, Object> modelCfg = (Map<String, Object>) config.getOrDefault("model", Map.of());
-        Path modelPath = root.resolve((String) modelCfg.getOrDefault("path", "models/local_model.bin"));
-        Path tokenizerPath = root.resolve((String) modelCfg.getOrDefault("tokenizer", "models/tokenizer.json"));
-
-        List<String> queries = DEFAULT_QUERIES;
-        int epochs = 5;
-        double lr = 0.05;
+        Path modelPath = root.resolve((String) modelCfg.getOrDefault("path", "models/local_model.bin")).normalize();
+        Path tokenizerPath = root.resolve((String) modelCfg.getOrDefault("tokenizer", "models/tokenizer.json")).normalize();
+        if (!modelPath.startsWith(root) || !tokenizerPath.startsWith(root)) throw new IllegalArgumentException("model paths must stay inside the workspace");
+        Path corpusPath = root.resolve((String) config.getOrDefault("training_corpus", ".")).normalize();
+        if (!corpusPath.startsWith(root)) throw new IllegalArgumentException("training corpus must stay inside the workspace");
+        if (!Files.isDirectory(corpusPath)) throw new IllegalArgumentException("local training corpus not found: " + corpusPath);
+        int epochs = 3;
+        double lr = 0.005;
         int maxChars = 20000;
-        int timeLimitMinutes = 120;
 
         Tokenizer tokenizer = Tokenizer.fromJson(tokenizerPath.toString());
         System.out.println("[tokenizer] loaded vocab_size=" + tokenizer.vocabularySize());
 
-        String text = fetchTrainingText(queries, maxChars);
-        System.out.println("[data] fetched " + text.length() + " chars");
-
-        if (text.isEmpty()) {
-            List<String> fallback = new ArrayList<>();
-            for (int i = 0; i < 50; i++) {
-                fallback.add("Python is a programming language.");
-                fallback.add("Machine learning is a subset of artificial intelligence.");
-                fallback.add("Software engineering involves designing and building software.");
-                fallback.add("Data structures include arrays, lists, trees, and graphs.");
-                fallback.add("Algorithms are step-by-step procedures for solving problems.");
-                fallback.add("Web development uses HTML, CSS, and JavaScript.");
-                fallback.add("Computer science studies computation and information.");
-            }
-            text = String.join("\n", fallback);
-        }
-
         List<String> texts = new ArrayList<>();
-        for (String t : text.split("\n\n")) {
-            if (t.strip().length() > 10) texts.add(t);
+        int charsRead = 0;
+        try (Stream<Path> files = Files.walk(corpusPath)) {
+            for (Path file : files.filter(Files::isRegularFile).filter(TrainModel::isRelevantCorpusFile).sorted().toList()) {
+                String filename = file.getFileName().toString().toLowerCase(Locale.ROOT);
+                if (!(filename.endsWith(".txt") || filename.endsWith(".md")
+                    || filename.endsWith(".java") || filename.endsWith(".py"))) continue;
+                if (charsRead >= maxChars || Files.size(file) > maxChars) continue;
+                String content = Files.readString(file);
+                int remaining = maxChars - charsRead;
+                if (content.length() > remaining) content = content.substring(0, remaining);
+                charsRead += content.length();
+                for (String section : content.split("\\R\\s*\\R")) {
+                    if (section.strip().length() > 10) texts.add(section);
+                }
+            }
         }
-        System.out.println("[data] training texts=" + texts.size());
+        if (texts.isEmpty()) throw new IllegalArgumentException("no usable local .txt, .md, .java, or .py files in " + corpusPath);
+        System.out.println("[data] loaded " + charsRead + " local characters from " + corpusPath);
+        System.out.println("[data] training sections=" + texts.size());
 
         System.out.println("[train] starting");
         long trainStart = System.currentTimeMillis();
@@ -92,43 +95,11 @@ public class TrainModel {
         System.out.println("[model] saved to: " + modelPath);
     }
 
-    private static String fetchTrainingText(List<String> queries, int maxChars) {
-        List<String> parts = new ArrayList<>();
-        for (String query : queries) {
-            if (parts.stream().mapToInt(String::length).sum() >= maxChars) break;
-            try {
-                String text = fetchWebText(query, maxChars / queries.size());
-                if (!text.isEmpty()) parts.add(text);
-            } catch (Exception e) {
-                // skip failed source
-            }
+    private static boolean isRelevantCorpusFile(Path file) {
+        for (Path part : file) {
+            String name = part.toString();
+            if (Set.of(".git", ".venv", "target", "build", "dist", "models", "node_modules").contains(name)) return false;
         }
-        return String.join("\n\n", parts);
-    }
-
-    private static String fetchWebText(String query, int maxChars) {
-        try {
-            String url = "https://www.bing.com/search?q=" + java.net.URLEncoder.encode(query, "UTF-8");
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
-            try (var in = new java.io.InputStreamReader(conn.getInputStream())) {
-                StringBuilder sb = new StringBuilder();
-                char[] buf = new char[4096];
-                int len;
-                while ((len = in.read(buf)) >= 0) sb.append(buf, 0, len);
-                String html = sb.toString();
-                StringBuilder text = new StringBuilder();
-                Pattern tagPattern = Pattern.compile("<(script|style|nav|header|footer|aside)[^>]*>.*?</(script|style|nav|header|footer|aside)>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
-                html = tagPattern.matcher(html).replaceAll("");
-                Matcher m = Pattern.compile(">([^<]+)<").matcher(html);
-                while (m.find()) {
-                    String content = m.group(1).trim();
-                    if (!content.isEmpty()) text.append(content).append("\n");
-                }
-                return text.toString().replaceAll("\\n{3,}", "\n\n").trim();
-            }
-        } catch (Exception e) {
-            return "";
-        }
+        return true;
     }
 }

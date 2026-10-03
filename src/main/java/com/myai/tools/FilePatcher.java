@@ -8,7 +8,7 @@ import java.util.Map;
 
 public class FilePatcher extends BaseTool {
     public String name() { return "patch_file"; }
-    public String description() { return "Replace one exact block in a workspace file." }
+    public String description() { return "Replace one exact block in a workspace file."; }
 
     private final FileReader reader;
     private final FileWriter writer;
@@ -36,7 +36,8 @@ public class FilePatcher extends BaseTool {
         String old = (String) validated.get("old");
         String n = (String) validated.get("new");
         if (countOccurrences(output, old) != 1) return new ToolResult(false, "", "old block must occur exactly once");
-        String newContent = output.replace(old, n, 1);
+        int match = output.indexOf(old);
+        String newContent = output.substring(0, match) + n + output.substring(match + old.length());
         Map<String, Object> writeArgs = Map.of("path", validated.get("path"), "content", newContent);
         return writer.run(writeArgs);
     }

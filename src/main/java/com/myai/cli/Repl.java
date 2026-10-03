@@ -4,6 +4,7 @@ import com.myai.agent.runtime.AgentConfig;
 import com.myai.agent.runtime.AgentResponse;
 import com.myai.agent.runtime.Orchestrator;
 import com.myai.agent.runtime.TaskList;
+import com.myai.core.engine.ModelLoader;
 import com.myai.cli.Highlighter;
 import com.myai.cli.Intent;
 import com.myai.cli.KeyBindings;
@@ -15,24 +16,32 @@ import com.myai.tools.DirWalker;
 import com.myai.tools.FilePatcher;
 import com.myai.tools.FileReader;
 import com.myai.tools.FileWriter;
+import com.myai.tools.GitIntegration;
 import com.myai.tools.HelpSearch;
 import com.myai.tools.Installer;
 import com.myai.tools.LinterBridge;
 import com.myai.tools.RepoManager;
 import com.myai.tools.ShellRunner;
 import com.myai.tools.SystemDiagnostics;
+import com.myai.tools.TrainModel;
 import com.myai.tools.ToolResult;
 import com.myai.tools.WebReader;
 import com.myai.tools.WebSearch;
 import com.myai.utils.ConfigLoader;
 
+import java.io.*;
+import java.nio.file.Path;
+import java.util.*;
+
 public class Repl {
     private static final String VERSION = "myai 0.1.0";
+    private static Path workspaceRoot;
 
     public static void main(String[] args) throws Exception {
         Map<String, Object> parsedArgs = parseArgs(args);
         String workspace = (String) parsedArgs.getOrDefault("workspace", ".");
         Path workspacePath = Path.of(workspace).toAbsolutePath().normalize();
+        workspaceRoot = workspacePath;
         List<String> task = (List<String>) parsedArgs.get("task");
 
         Renderer renderer = new Renderer();
@@ -47,6 +56,7 @@ public class Repl {
         tools.put("lint", new LinterBridge());
         tools.put("diagnostics", new SystemDiagnostics());
         tools.put("search", new HelpSearch(workspace));
+        tools.put("git", new GitIntegration(workspace));
         tools.put("repo", new RepoManager(workspace));
         tools.put("install", new Installer(workspace));
         tools.put("shell", new ShellRunner(workspace, (cmd, reason) -> {
@@ -54,8 +64,25 @@ public class Repl {
             return false;
         }));
 
-        AgentConfig config = new AgentConfig();
-        Orchestrator agent = new Orchestrator(null, tools, config);
+        Map<String, Object> appConfig = new LinkedHashMap<>(ConfigLoader.loadConfig(workspacePath.resolve("config.json").toString()));
+        Map<String, Object> modelConfig = new LinkedHashMap<>((Map<String, Object>) appConfig.getOrDefault("model", Map.of()));
+        for (String key : List.of("path", "tokenizer")) {
+            Object configuredPath = modelConfig.get(key);
+            if (configuredPath instanceof String value && !value.isBlank()) {
+                Path modelFile = workspacePath.resolve(value).normalize();
+                if (!modelFile.startsWith(workspacePath)) throw new IllegalArgumentException("model paths must stay inside the workspace");
+                modelConfig.put(key, modelFile.toString());
+            }
+        }
+        appConfig.put("model", modelConfig);
+        java.util.function.Function<List<Map<String, String>>, String> model = null;
+        try {
+            model = ModelLoader.loadLocalModel(appConfig);
+        } catch (Exception e) {
+            System.out.println(renderer.activity("model unavailable", e.getMessage()));
+        }
+        if (model != null) System.out.println(renderer.activity("model ready", "loaded local model weights"));
+        Orchestrator agent = new Orchestrator(model, tools, new AgentConfig());
 
         if (task != null && !task.isEmpty()) {
             String commandStr = String.join(" ", task);
@@ -100,6 +127,7 @@ public class Repl {
     }
 
     private static int runRequest(Orchestrator agent, Renderer renderer, String text, TaskList tasks) {
+        System.out.println(renderer.activity("thinking", "matching your request to local tools"));
         Intent intent = Intent.parseIntent(text);
         if (intent != null) {
             System.out.println(renderer.activity("understood", intent.explanation()));
@@ -109,12 +137,32 @@ public class Repl {
         if (words.length == 0) return -1;
         int result = runCommand(agent, renderer, words[0], Arrays.asList(words).subList(1, words.length), tasks);
         if (result >= 0) return result;
+        System.out.println(renderer.activity("working", "checking local code and documentation for relevant context"));
         return -1;
     }
 
     private static int runCommand(Orchestrator agent, Renderer renderer, String command, List<String> arguments, TaskList tasks) {
         String detail = command + (arguments.isEmpty() ? "" : " " + String.join(" ", arguments));
-        System.out.println(renderer.activity("executing", detail));
+        if ("learn".equals(command)) {
+            System.out.println(renderer.activity("learning", "reading bounded local source and documentation"));
+            try {
+                TrainModel.train(workspaceRoot);
+                System.out.println(renderer.activity("completed", "local model training"));
+                return 0;
+            } catch (Exception e) {
+                System.out.println(renderer.activity("failed", "local model training"));
+                System.out.println(renderer.error(e.getMessage()));
+                return 1;
+            }
+        }
+        String progress = switch (command) {
+            case "read_file" -> "reading " + (arguments.isEmpty() ? "a file" : arguments.get(0));
+            case "write_file", "patch_file" -> "editing " + (arguments.isEmpty() ? "a file" : arguments.get(0));
+            case "search" -> "searching local code and docs for " + String.join(" ", arguments);
+            case "git" -> "checking local Git " + String.join(" ", arguments);
+            default -> "working on " + detail;
+        };
+        System.out.println(renderer.activity("working", progress));
         BaseTool tool = agent.tools().get(command);
         if (tool == null) {
             return -1;
@@ -150,6 +198,10 @@ public class Repl {
                         yield new ToolResult(false, "", "missing query");
                     }
                     yield agent.tools().get("search").run(Map.of("query", String.join(" ", arguments)));
+                }
+                case "git" -> {
+                    if (arguments.isEmpty()) yield new ToolResult(false, "", "which Git information should I check?");
+                    yield agent.tools().get("git").run(Map.of("operation", arguments.get(0)));
                 }
                 case "todo" -> {
                     if (arguments.isEmpty() || "list".equals(arguments.get(0))) {

@@ -36,7 +36,7 @@ public class GenerateModel {
         Random random = new Random(42);
         Map<String, Tensor> weights = new LinkedHashMap<>();
         weights.put("tok_embeddings", randTensor(new int[]{vocabSize, hiddenSize}, 0.02, random));
-        weights.put("final_norm", new Tensor(new Tensor.Shape(hiddenSize), fillList(hiddenSize, 1.0)));
+        weights.put("final_norm", new Tensor(new Tensor.Shape(new int[]{hiddenSize}), fillList(hiddenSize, 1.0)));
         weights.put("lm_head", randTensor(new int[]{vocabSize, hiddenSize}, 0.02, random));
 
         for (int i = 0; i < layers; i++) {
@@ -47,8 +47,8 @@ public class GenerateModel {
             weights.put(p + ".attention.output_proj", randTensor(new int[]{hiddenSize, hiddenSize}, 0.02, random));
             weights.put(p + ".feed_forward.w1", randTensor(new int[]{hiddenSize * 4, hiddenSize}, 0.02, random));
             weights.put(p + ".feed_forward.w2", randTensor(new int[]{hiddenSize, hiddenSize * 4}, 0.02, random));
-            weights.put(p + ".attention_norm", new Tensor(new Tensor.Shape(hiddenSize), fillList(hiddenSize, 1.0)));
-            weights.put(p + ".feed_forward_norm", new Tensor(new Tensor.Shape(hiddenSize), fillList(hiddenSize, 1.0)));
+            weights.put(p + ".attention_norm", new Tensor(new Tensor.Shape(new int[]{hiddenSize}), fillList(hiddenSize, 1.0)));
+            weights.put(p + ".feed_forward_norm", new Tensor(new Tensor.Shape(new int[]{hiddenSize}), fillList(hiddenSize, 1.0)));
         }
 
         Path weightsPath = modelDir.resolve("local_model.bin");

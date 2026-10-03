@@ -1,10 +1,11 @@
 package com.myai.tools;
 
 import java.util.Map;
+import java.util.Set;
 
 public class GitIntegration extends BaseTool {
     public String name() { return "git"; }
-    public String description() { return "Inspect git state with safe read-only operations." }
+    public String description() { return "Inspect git state with safe read-only operations."; }
 
     private final ShellRunner runner;
 

@@ -8,8 +8,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 public class Orchestrator {
-    public static final Pattern TOOL_PATTERN = Pattern.compile("<tool\\s+name=[\"'](?P<name>[\\w.-]+)[\"']\\s*>(?P<body>.*?)</tool>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
-    public static final Pattern JSON_PATTERN = Pattern.compile("```tool\\s*(?P<body>\\{.*?\\})\\s*```", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+    public static final Pattern TOOL_PATTERN = Pattern.compile("<tool\\s+name=[\"'](?<name>[\\w.-]+)[\"']\\s*>(?<body>.*?)</tool>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+    public static final Pattern JSON_PATTERN = Pattern.compile("```tool\\s*(?<body>\\{.*?\\})\\s*```", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     private final Function<List<Map<String, String>>, String> model;
     private final Map<String, BaseTool> tools;
@@ -49,7 +49,12 @@ public class Orchestrator {
         for (int step = 0; step < maxSteps; step++) {
             this.state.transition(SessionStatus.THINKING);
             List<Map<String, String>> context = this.compressor.compress(this.messages);
-            String generated = this.model != null ? this.model.apply(context) : null;
+            String generated;
+            try {
+                generated = this.model != null ? this.model.apply(context) : null;
+            } catch (RuntimeException e) {
+                generated = null;
+            }
             if (generated == null) {
                 generated = fallback(task, modelConfigured);
                 this.messages.add(Map.of("role", "assistant", "content", generated));
@@ -125,8 +130,17 @@ public class Orchestrator {
     private String fallback(String task, boolean modelConfigured) {
         String conversational = Conversation.localReply(task);
         if (conversational != null) return conversational;
+        BaseTool searchTool = this.tools.get("search");
+        if (searchTool != null) {
+            ToolResult references = searchTool.run(Map.of("query", task, "limit", 5));
+            if (references.ok() && !references.output().isBlank()
+                && !references.output().startsWith("No local results")) {
+                return "I could not generate a reliable answer, so I searched this workspace for relevant references:\n\n"
+                    + references.output();
+            }
+        }
         if (modelConfigured) {
-            return "Task received: " + task + "\n\nThe local model is configured but produced unreadable output. The CLI remains useful for deterministic workspace tools. Try `diagnostics`, `walk *.py`, `read README.md`, or `lint PATH`.";
+            return "Task received: " + task + "\n\nThe local model did not produce a reliable answer. I can still inspect this workspace, search local code and documentation, read files, and check Git.";
         }
         return "Task received: " + task + "\n\nNeural generation is unavailable because config.json has no local model path configured. The CLI is online and its deterministic workspace tools are ready. Try `diagnostics`, `walk *.py`, `read README.md`, or `lint PATH`.";
     }

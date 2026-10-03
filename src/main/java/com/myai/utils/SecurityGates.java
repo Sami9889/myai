@@ -24,7 +24,7 @@ public class SecurityGates {
         return new GateDecision(true, "command is within the default policy", false);
     }
 
-    public static void requireConfirmation(String command, java.util.function.BiFunction<String, String, Boolean> confirmer) {
+    public static void requireConfirmation(String command, java.util.function.BiFunction<String, String, Boolean> confirmer) throws SecurityError {
         GateDecision decision = inspectCommand(command);
         if (decision.requiresConfirmation() && !confirmer.apply(command, decision.reason())) {
             throw new SecurityError("operation rejected by confirmation gate");

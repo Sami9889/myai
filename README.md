@@ -58,6 +58,24 @@ install this repo yes
 
 Natural requests use the same repository-scoped tools as exact commands.
 
+You can also ask how a local class works, ask for a Git status/diff, or say “learn from this workspace.” Coding questions search current source and documentation as needed. Learning uses a bounded local corpus and does not contact the network.
+
+### Python and Git Reference
+
+```python
+def normalize_names(names: list[str]) -> list[str]:
+	return [name.strip().lower() for name in names if name.strip()]
+
+try:
+	result = normalize_names([" Ada ", ""])
+except ValueError as error:
+	print(error)
+```
+
+Python blocks are defined by indentation. Functions use `def`; loops use `for` or `while`; comprehensions use `[value for item in items if condition]`; exceptions use `try` and `except`.
+
+Common read-only Git checks are `git status --short --branch`, `git diff`, `git log --oneline -10`, and `git branch --show-current`. Changes are staged with `git add -- PATH`, recorded with `git commit -m MESSAGE`, and sent with `git push`; repository-changing actions in myai require explicit confirmation.
+
 ## Development
 
 ```sh
@@ -66,6 +84,8 @@ make lint
 ```
 
 High-risk commands require an explicit confirmation gate. Network access is disabled by default.
+
+The checked-in model is randomly initialized, not a pretrained coding model. The current trainer optimizes the output projection only; it does not backpropagate through transformer layers and cannot teach the model all programming knowledge. Workspace search is the reliable source of project-specific answers.
 
 ## Coding Prompt Pack
 

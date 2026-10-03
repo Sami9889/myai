@@ -160,7 +160,7 @@ public class Tokenizer {
     }
 
     public int vocabularySize() {
-        return vocabulary.size();
+        return vocabulary.values().stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;
     }
 
     public Map<String, Integer> getVocabulary() {

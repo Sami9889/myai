@@ -10,7 +10,7 @@ import java.util.*;
 
 public class Tensor {
     public record Shape(int[] value) {
-        public Shape(int... dims) { this(dims != null ? dims.clone() : new int[0]); }
+        public Shape { value = value != null ? value.clone() : new int[0]; }
         public int rank() { return value.length; }
         public int size() { int s = 1; for (int d : value) s *= d; return s; }
     }
@@ -42,6 +42,7 @@ public class Tensor {
 
     public Shape shape() { return shape; }
     public List<Double> data() { return Collections.unmodifiableList(data); }
+    List<Double> mutableData() { return data; }
     public int size() { return data.size(); }
 
     public static Tensor zeros(int[] shape) {
@@ -53,7 +54,9 @@ public class Tensor {
     public static Tensor filled(int[] shape, double value) {
         int size = 1;
         for (int d : shape) size *= d;
-        return new Tensor(shape, new double[size]);
+        double[] values = new double[size];
+        java.util.Arrays.fill(values, value);
+        return new Tensor(shape, values);
     }
 
     public static Tensor fromNested(List<?> values) {
@@ -79,20 +82,20 @@ public class Tensor {
     }
 
     public double get(int... indices) {
-        if (indices.length != shape.rank()) throw new IndexError("wrong rank");
+        if (indices.length != shape.rank()) throw new IndexOutOfBoundsException("wrong rank");
         int offset = 0;
         for (int i = 0; i < indices.length; i++) {
-            if (indices[i] < 0 || indices[i] >= shape.value()[i]) throw new IndexError("index out of bounds");
+            if (indices[i] < 0 || indices[i] >= shape.value()[i]) throw new IndexOutOfBoundsException("index out of bounds");
             offset = offset * shape.value()[i] + indices[i];
         }
         return data.get(offset);
     }
 
     public void set(int[] indices, double value) {
-        if (indices.length != shape.rank()) throw new IndexError("wrong rank");
+        if (indices.length != shape.rank()) throw new IndexOutOfBoundsException("wrong rank");
         int offset = 0;
         for (int i = 0; i < indices.length; i++) {
-            if (indices[i] < 0 || indices[i] >= shape.value()[i]) throw new IndexError("index out of bounds");
+            if (indices[i] < 0 || indices[i] >= shape.value()[i]) throw new IndexOutOfBoundsException("index out of bounds");
             offset = offset * shape.value()[i] + indices[i];
         }
         data.set(offset, value);
@@ -140,7 +143,7 @@ public class Tensor {
                 result.add(data.get(row * cols + col));
             }
         }
-        return new Tensor(new Shape(cols, rows), result);
+        return new Tensor(new Shape(new int[]{cols, rows}), result);
     }
 
     public Tensor matmul(Tensor other) {
@@ -160,7 +163,7 @@ public class Tensor {
                 }
             }
         }
-        return new Tensor(new Shape(rows, cols), result);
+        return new Tensor(new Shape(new int[]{rows, cols}), result);
     }
 
     public Tensor softmax(int axis) {

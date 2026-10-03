@@ -6,7 +6,7 @@ import java.util.Map;
 
 public class SystemDiagnostics extends BaseTool {
     public String name() { return "diagnostics"; }
-    public String description() { return "Report local runtime and resource information." }
+    public String description() { return "Report local runtime and resource information."; }
 
     @Override
     public Map<String, Object> validate(Map<String, Object> arguments) {

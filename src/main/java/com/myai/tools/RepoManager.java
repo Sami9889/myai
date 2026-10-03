@@ -7,10 +7,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.*;
 
 public class RepoManager extends BaseTool {
     public String name() { return "repo"; }
-    public String description() { return "Inspect and explicitly publish changes in the current Git repository." }
+    public String description() { return "Inspect and explicitly publish changes in the current Git repository."; }
 
     private Path workspace;
 
@@ -23,13 +24,14 @@ public class RepoManager extends BaseTool {
         String operation = string(arguments, "operation", null);
         if (!Set.of("status", "add", "commit", "push").contains(operation))
             throw new IllegalArgumentException("operation must be status, add, commit, or push");
-        boolean confirm = (Boolean) arguments.getOrDefault("confirm", false);
-        if (!(confirm instanceof Boolean)) throw new IllegalArgumentException("confirm must be boolean");
+        Object confirmValue = arguments.getOrDefault("confirm", false);
+        if (!(confirmValue instanceof Boolean confirm)) throw new IllegalArgumentException("confirm must be boolean");
         Object pathsObj = arguments.get("paths");
+        if (pathsObj == null) pathsObj = List.of();
         if (!(pathsObj instanceof List<?> paths) || paths.stream().anyMatch(p -> !(p instanceof String)))
             throw new IllegalArgumentException("paths must be a list of strings");
-        String message = (String) arguments.getOrDefault("message", "");
-        if (!(message instanceof String)) throw new IllegalArgumentException("message must be a string");
+        Object messageValue = arguments.getOrDefault("message", "");
+        if (!(messageValue instanceof String message)) throw new IllegalArgumentException("message must be a string");
         return Map.of("operation", operation, "confirm", confirm, "paths", pathsObj, "message", message);
     }
 
@@ -50,7 +52,9 @@ public class RepoManager extends BaseTool {
                     Path path = Validators.confinedPath(p, workspace.toString());
                     safePaths.add(workspace.relativize(path).toString());
                 }
-                return runGit("add", "--", String.join(" ", safePaths));
+                List<String> command = new ArrayList<>(List.of("add", "--"));
+                command.addAll(safePaths);
+                return runGit(command.toArray(String[]::new));
             }
             case "commit" -> {
                 String message = ((String) arguments.get("message")).strip();

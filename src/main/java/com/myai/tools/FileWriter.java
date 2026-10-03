@@ -9,7 +9,7 @@ import java.util.Map;
 
 public class FileWriter extends BaseTool {
     public String name() { return "write_file"; }
-    public String description() { return "Atomically write a text file in the workspace." }
+    public String description() { return "Atomically write a text file in the workspace."; }
 
     private Path workspace;
 

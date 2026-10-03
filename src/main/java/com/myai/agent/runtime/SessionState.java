@@ -41,6 +41,10 @@ public class SessionState {
         if (message != null && !message.isEmpty()) this.events.add(message);
     }
 
+    public void transition(SessionStatus status) {
+        transition(status, null);
+    }
+
     public void fail(String message) {
         this.errors.add(message);
         transition(SessionStatus.FAILED, message);

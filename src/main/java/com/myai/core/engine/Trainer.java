@@ -20,13 +20,19 @@ public class Trainer {
         }
         double logSum = maxLogit + Math.log(total);
         double loss = -logits.get(target) + logSum;
-        List<Double> probs = new ArrayList<>(exps.size());
-        for (double x : exps) probs.add(x / total);
-        List<Double> grad = new ArrayList<>(probs.size());
-        for (int i = 0; i < probs.size(); i++) {
-            grad.add(probs.get(i) - (i == target ? 1.0 : 0.0));
-        }
         return loss;
+    }
+
+    private static List<Double> crossEntropyGradient(List<Double> logits, int target) {
+        if (target < 0 || target >= logits.size()) throw new IllegalArgumentException("target token is outside the model vocabulary");
+        double maximum = Collections.max(logits);
+        double total = 0.0;
+        for (double logit : logits) total += Math.exp(logit - maximum);
+        List<Double> gradient = new ArrayList<>(logits.size());
+        for (int i = 0; i < logits.size(); i++) {
+            gradient.add(Math.exp(logits.get(i) - maximum) / total - (i == target ? 1.0 : 0.0));
+        }
+        return gradient;
     }
 
     private static void clipGradients(List<Double> data, double maxNorm) {
@@ -53,7 +59,7 @@ public class Trainer {
     }
 
     public static double trainStep(Transformer.DecoderTransformer transformer, Tokenizer tokenizer, List<Integer> tokens, double lr) {
-        int ctx = transformer.config.contextLength();
+        int ctx = transformer.config().contextLength();
         double totalLoss = 0.0;
         int count = 0;
 
@@ -74,9 +80,9 @@ public class Trainer {
             for (Transformer.TransformerBlock block : blocks) {
                 List<List<Double>> normalized = new ArrayList<>(sequence.size());
                 for (List<Double> row : sequence) {
-                    normalized.add(block.attentionNorm().apply(row));
+                    normalized.add(block.attentionNorm.apply(row));
                 }
-                List<List<Double>> attention = block.attention().apply(normalized);
+                List<List<Double>> attention = block.attention.apply(normalized);
                 List<List<Double>> residual = new ArrayList<>(sequence.size());
                 for (int i = 0; i < sequence.size(); i++) {
                     List<Double> row = sequence.get(i);
@@ -87,75 +93,54 @@ public class Trainer {
                 }
                 sequence = new ArrayList<>(residual.size());
                 for (List<Double> row : residual) {
-                    List<Double> ffnOut = block.feedForward().apply(block.feedForwardNorm().apply(row));
+                    List<Double> ffnOut = block.feedForward.apply(block.feedForwardNorm.apply(row));
                     List<Double> combined = new ArrayList<>(row.size());
                     for (int j = 0; j < row.size(); j++) combined.add(row.get(j) + ffnOut.get(j));
                     sequence.add(combined);
                 }
             }
-            List<Double> hidden = finalNorm.apply(sequence.get(sequence.size() - 1));
-            List<Double> logits = output.apply(hidden);
+            List<Double> hidden = transformer.finalNorm().apply(sequence.get(sequence.size() - 1));
+            List<Double> logits = transformer.output().apply(hidden);
 
             double loss = crossEntropyLoss(logits, target);
             totalLoss += loss;
             count++;
 
-            List<Double> grad = new ArrayList<>(logits.size());
-            for (int i = 0; i < logits.size(); i++) {
-                grad.add(logits.get(i) - (i == target ? 1.0 : 0.0));
-            }
+            List<Double> grad = crossEntropyGradient(logits, target);
 
             clipGradients(grad, 1.0);
-            for (int i = 0; i < output.weight.shape().value()[0]; i++) {
-                for (int j = 0; j < output.weight.shape().value()[1]; j++) {
-                    int idx = i * output.weight.shape().value()[1] + j;
-                    output.weight.data().set(idx, output.weight.data().get(idx) - lr * grad.get(i) * hidden.get(j));
-                    double val = output.weight.data().get(idx);
+            List<Double> outputWeights = new ArrayList<>(output.weight().data());
+            for (int i = 0; i < output.weight().shape().value()[0]; i++) {
+                for (int j = 0; j < output.weight().shape().value()[1]; j++) {
+                    int idx = i * output.weight().shape().value()[1] + j;
+                    output.weight().mutableData().set(idx, outputWeights.get(idx) - lr * grad.get(i) * hidden.get(j));
+                    double val = output.weight().data().get(idx);
                     if (Double.isFinite(val)) {
-                        output.weight.data().set(idx, Math.max(-10.0, Math.min(10.0, val)));
+                        output.weight().mutableData().set(idx, Math.max(-10.0, Math.min(10.0, val)));
                     } else {
-                        output.weight.data().set(idx, 0.0);
+                        output.weight().mutableData().set(idx, 0.0);
                     }
                 }
             }
-            if (output.bias != null) {
+            if (output.bias() != null) {
                 for (int i = 0; i < grad.size(); i++) {
-                    output.bias.data().set(i, output.bias.data().get(i) - lr * grad.get(i));
-                    double val = output.bias.data().get(i);
+                    output.bias().mutableData().set(i, output.bias().data().get(i) - lr * grad.get(i));
+                    double val = output.bias().data().get(i);
                     if (Double.isFinite(val)) {
-                        output.bias.data().set(i, Math.max(-10.0, Math.min(10.0, val)));
+                        output.bias().mutableData().set(i, Math.max(-10.0, Math.min(10.0, val)));
                     } else {
-                        output.bias.data().set(i, 0.0);
+                        output.bias().mutableData().set(i, 0.0);
                     }
                 }
             }
 
-            List<Double> hiddenGrad = new ArrayList<>(hidden.size());
-            for (int i = 0; i < hidden.size(); i++) hiddenGrad.add(0.0);
-            for (int i = 0; i < hidden.size(); i++) {
-                for (int j = 0; j < grad.size(); j++) {
-                    hiddenGrad.set(i, hiddenGrad.get(i) + grad.get(j) * output.weight.data().get(j * output.weight.shape().value()[1] + i));
-                }
-            }
-
-            for (int i = 0; i < hiddenGrad.size(); i++) {
-                for (int j = 0; j < sequence.get(sequence.size() - 1).size(); j++) {
-                    int idx = chunk.get(chunk.size() - 1) * embeddings.shape().value()[1] + j;
-                    double val = embeddings.data().get(idx) - lr * hiddenGrad.get(i) * sequence.get(sequence.size() - 1).get(j);
-                    if (Double.isFinite(val)) {
-                        embeddings.data().set(idx, Math.max(-10.0, Math.min(10.0, val)));
-                    } else {
-                        embeddings.data().set(idx, 0.0);
-                    }
-                }
-            }
         }
         return totalLoss / Math.max(1, count);
     }
 
     public static void trainOnText(Path modelPath, Tokenizer tokenizer, List<String> texts, int epochs, double lr, Long seed, ProgressCallback progressCallback) {
         Map<String, Tensor> records;
-        try (WeightFile wf = new WeightFile(modelPath)) {
+        try (WeightsParser.WeightFile wf = new WeightsParser.WeightFile(modelPath)) {
             records = new LinkedHashMap<>();
             for (String name : wf.names()) {
                 records.put(name, wf.read(name));

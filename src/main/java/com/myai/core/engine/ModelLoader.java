@@ -107,20 +107,20 @@ public class ModelLoader {
         Sampler sampler = new Sampler(samplingConfig);
 
         int eosToken = tokenizer.getVocabulary().getOrDefault("<eos>", -1);
+        Tokenizer modelTokenizer = tokenizer;
 
         return messages -> {
             StringBuilder prompt = new StringBuilder();
             for (Map<String, String> m : messages) {
                 prompt.append(m.getOrDefault("role", "user")).append(": ").append(m.getOrDefault("content", "")).append("\n");
             }
-            List<Integer> tokenIds = tokenizer.encode(prompt.toString());
+            List<Integer> tokenIds = modelTokenizer.encode(prompt.toString());
             int maxNew = (Integer) runtime.getOrDefault("max_new_tokens", 32);
-            List<Integer> generated = new ArrayList<>(tokenIds);
+            int promptStart = Math.max(0, tokenIds.size() - ctx);
+            List<Integer> generated = new ArrayList<>(tokenIds.subList(promptStart, tokenIds.size()));
+            int generationStart = generated.size();
 
             for (int i = 0; i < maxNew; i++) {
-                if (generated.size() > ctx) {
-                    generated = new ArrayList<>(generated.subList(generated.size() - ctx, generated.size()));
-                }
                 List<Double> logits = transformer.logits(generated);
                 List<Integer> history = new ArrayList<>(generated);
                 int nextId = sampler.sample(logits, history);
@@ -128,8 +128,8 @@ public class ModelLoader {
                 if (eosToken >= 0 && nextId == eosToken) break;
             }
 
-            List<Integer> newIds = generated.subList(tokenIds.size(), generated.size());
-            String text = tokenizer.decode(newIds);
+            List<Integer> newIds = generated.subList(generationStart, generated.size());
+            String text = modelTokenizer.decode(newIds);
             if (!isReadable(text)) return null;
             return text;
         };
@@ -140,10 +140,24 @@ public class ModelLoader {
         text = text.strip();
         if (text.isEmpty()) return false;
         int printable = 0;
+        int readable = 0;
+        int words = 0;
+        boolean inWord = false;
         for (char ch : text.toCharArray()) {
-            if (Character.isPrintable(ch) || Character.isWhitespace(ch)) printable++;
+            if (ch == '\uFFFD') return false;
+            if (Character.isISOControl(ch) && !Character.isWhitespace(ch)) return false;
+            printable++;
+            if (Character.isLetterOrDigit(ch)) {
+                readable++;
+                if (!inWord) words++;
+                inWord = true;
+            } else {
+                inWord = false;
+            }
         }
-        return printable >= (int) Math.max(1, text.length() * 0.7);
+        return printable >= (int) Math.max(1, text.length() * 0.9)
+            && readable >= Math.max(1, text.length() / 3)
+            && (text.length() < 8 || words >= 2);
     }
 
     private static Tensor first(Map<String, Tensor> records, String... names) {

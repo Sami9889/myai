@@ -4,7 +4,7 @@ import java.util.Map;
 
 public class CodeExecutor extends BaseTool {
     public String name() { return "python"; }
-    public String description() { return "Execute a Python snippet with timeout and no inherited environment." }
+    public String description() { return "Execute a Python snippet with timeout and no inherited environment."; }
 
     private final ShellRunner runner;
 

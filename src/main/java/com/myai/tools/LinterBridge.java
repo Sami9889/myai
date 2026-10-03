@@ -6,7 +6,7 @@ import java.util.Map;
 
 public class LinterBridge extends BaseTool {
     public String name() { return "lint"; }
-    public String description() { return "Validate source files for syntax errors." }
+    public String description() { return "Validate source files for syntax errors."; }
 
     @Override
     public Map<String, Object> validate(Map<String, Object> arguments) {

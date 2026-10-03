@@ -4,7 +4,7 @@ public record Token(int id, byte[] text) {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Token token) return false;
+        if (!(o instanceof Token token)) return false;
         return id == token.id && java.util.Arrays.equals(text, token.text);
     }
 

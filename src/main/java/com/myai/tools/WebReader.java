@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 public class WebReader extends BaseTool {
     public String name() { return "web_read"; }
-    public String description() { return "Fetch a webpage and return its readable text content." }
+    public String description() { return "Fetch a webpage and return its readable text content."; }
 
     private boolean allowNetwork;
     private int timeout;

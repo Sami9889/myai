@@ -8,7 +8,7 @@ import java.util.Map;
 
 public class FileReader extends BaseTool {
     public String name() { return "read_file"; }
-    public String description() { return "Read a bounded text file from the workspace." }
+    public String description() { return "Read a bounded text file from the workspace."; }
 
     private Path workspace;
 

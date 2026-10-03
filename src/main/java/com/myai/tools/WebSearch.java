@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 public class WebSearch extends BaseTool {
     public String name() { return "web_search"; }
-    public String description() { return "Search the web for up-to-date information using Bing." }
+    public String description() { return "Search the web for up-to-date information using Bing."; }
 
     private boolean allowNetwork;
     private int timeout;

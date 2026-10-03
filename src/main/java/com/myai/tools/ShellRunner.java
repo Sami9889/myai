@@ -3,11 +3,12 @@ package com.myai.tools;
 import com.myai.utils.SecurityGates;
 
 import java.util.Map;
+import java.nio.file.Path;
 import java.util.function.BiFunction;
 
 public class ShellRunner extends BaseTool {
     public String name() { return "shell"; }
-    public String description() { return "Run a non-network shell command after policy confirmation." }
+    public String description() { return "Run a non-network shell command after policy confirmation."; }
 
     private Path workspace;
     private BiFunction<String, String, Boolean> confirmer;

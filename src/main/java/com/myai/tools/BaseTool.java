@@ -8,9 +8,11 @@ public abstract class BaseTool {
     public String name;
     public String description;
 
+    public abstract String name();
+    public abstract String description();
     public abstract Map<String, Object> validate(Map<String, Object> arguments);
 
-    public abstract ToolResult execute(Map<String, Object> arguments);
+    public abstract ToolResult execute(Map<String, Object> arguments) throws Exception;
 
     public ToolResult run(Map<String, Object> arguments) {
         if (!(arguments instanceof Map)) return new ToolResult(false, "", "arguments must be a JSON object");
